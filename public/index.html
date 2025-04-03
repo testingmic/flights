@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Tracker</title>
+    
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?sensor=false&callback=myMap"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="public/styles.css">
+    
+    <script src="public/script.js" defer></script>
+</head>
+<body>
+    <header>
+        <h1>Live Flight Tracker</h1>
+    </header>
+    
+    <div class="container">
+        <main class="map-container">
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Search by country, state, or flight number...">
+                <div class="suggestions" id="suggestions"></div>
+            </div>
+            <div id="map"></div>
+        </main>
+
+        <aside class="sidebar">
+            <h2>Flights</h2>
+            <ul id="flight-list">
+                <li>Loading flights...</li>
+            </ul>
+        </aside>
+    </div>
+</body>
+</html>
