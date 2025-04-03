@@ -39,11 +39,34 @@ class Flight {
         try {
             $this->conn->beginTransaction();
 
-            $query = "INSERT INTO flights (icao24, callsign, origin_country, longitude, latitude, altitude, velocity, last_contact)
-                      VALUES (:icao24, :callsign, :origin_country, :longitude, :latitude, :altitude, :velocity, NOW())
-                      ON DUPLICATE KEY UPDATE 
-                      callsign = VALUES(callsign), longitude = VALUES(longitude), latitude = VALUES(latitude),
-                      altitude = VALUES(altitude), velocity = VALUES(velocity), last_contact = NOW()";
+            $query = "INSERT INTO flights (
+                icao24, callsign, origin_country, time_position, last_contact,
+                longitude, latitude, baro_altitude, on_ground, velocity,
+                true_track, vertical_rate, sensors, geo_altitude, squawk,
+                spi, position_source, category
+            ) VALUES (
+                :icao24, :callsign, :origin_country, :time_position, NOW(),
+                :longitude, :latitude, :baro_altitude, :on_ground, :velocity,
+                :true_track, :vertical_rate, :sensors, :geo_altitude, :squawk,
+                :spi, :position_source, :category
+            ) ON DUPLICATE KEY UPDATE 
+                callsign = VALUES(callsign),
+                origin_country = VALUES(origin_country),
+                time_position = VALUES(time_position),
+                last_contact = NOW(),
+                longitude = VALUES(longitude),
+                latitude = VALUES(latitude),
+                baro_altitude = VALUES(baro_altitude),
+                on_ground = VALUES(on_ground),
+                velocity = VALUES(velocity),
+                true_track = VALUES(true_track),
+                vertical_rate = VALUES(vertical_rate),
+                sensors = VALUES(sensors),
+                geo_altitude = VALUES(geo_altitude),
+                squawk = VALUES(squawk),
+                spi = VALUES(spi),
+                position_source = VALUES(position_source),
+                category = VALUES(category)";
 
             $stmt = $this->conn->prepare($query);
 
@@ -55,12 +78,22 @@ class Flight {
 
                 $stmt->execute([
                     ':icao24' => $flight['icao24'],
-                    ':callsign' => $flight['callsign'],
-                    ':origin_country' => $flight['origin_country'],
-                    ':longitude' => $flight['longitude'],
-                    ':latitude' => $flight['latitude'],
-                    ':altitude' => $flight['altitude'],
-                    ':velocity' => $flight['velocity']
+                    ':callsign' => $flight['callsign'] ?? null,
+                    ':origin_country' => $flight['origin_country'] ?? null,
+                    ':time_position' => $flight['time_position'] ?? null,
+                    ':longitude' => $flight['longitude'] ?? null,
+                    ':latitude' => $flight['latitude'] ?? null,
+                    ':baro_altitude' => $flight['baro_altitude'] ?? null,
+                    ':on_ground' => $flight['on_ground'] ?? null,
+                    ':velocity' => $flight['velocity'] ?? null,
+                    ':true_track' => $flight['true_track'] ?? null,
+                    ':vertical_rate' => $flight['vertical_rate'] ?? null,
+                    ':sensors' => $flight['sensors'] ?? null,
+                    ':geo_altitude' => $flight['geo_altitude'] ?? null,
+                    ':squawk' => $flight['squawk'] ?? null,
+                    ':spi' => $flight['spi'] ?? null,
+                    ':position_source' => $flight['position_source'] ?? null,
+                    ':category' => $flight['category'] ?? null
                 ]);
             }
 
@@ -83,7 +116,7 @@ class Flight {
     
     public function getFlights($searchTerm = "") {
         try {
-            $query = "SELECT * FROM flights WHERE last_contact >= NOW() - INTERVAL 30 MINUTE";
+            $query = "SELECT • FROM flights WHERE last_contact >= NOW() - INTERVAL 30 MINUTE";
         
             if (!empty($searchTerm)) {
                 $query .= " AND (callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%')";
@@ -101,7 +134,7 @@ class Flight {
     public function searchFlights($searchTerm) {
         try {
             // Search in both callsign and origin_country with better matching
-            $query = "SELECT * FROM flights WHERE callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%'";
+            $query = "SELECT • FROM flights WHERE callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%'";
             $stmt = $this->conn->prepare($query);
             $stmt->execute();
             

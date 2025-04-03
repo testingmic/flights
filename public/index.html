@@ -29,6 +29,111 @@
     </div>
     
     <div class="container">
+        <!-- Flight Details Modal -->
+        <div id="flight-details-modal" class="flight-details-modal">
+            <div class="modal-header">
+                <div class="flight-identifier">
+                    <h2 class="flight-callsign"></h2>
+                    <div class="flight-subheader">
+                        <span class="flight-icao"></span>
+                        <span class="flight-operator"></span>
+                    </div>
+                </div>
+                <button class="close-modal">×</button>
+            </div>
+            
+            <div class="modal-content">
+                <div class="flight-image">
+                    <img src="" alt="Aircraft" id="aircraft-image">
+                    <div class="image-navigation">
+                        <span class="nav-dot active"></span>
+                        <span class="nav-dot"></span>
+                        <span class="nav-dot"></span>
+                    </div>
+                </div>
+                
+                <div class="flight-route">
+                    <div class="route-points">
+                        <div class="departure">
+                            <h3 class="airport-code"></h3>
+                            <p class="airport-name"></p>
+                            <div class="time-info">
+                                <div class="scheduled">Scheduled: <span></span></div>
+                                <div class="actual">Actual: <span></span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="route-line">
+                            <div class="plane-icon">✈</div>
+                        </div>
+                        
+                        <div class="arrival">
+                            <h3 class="airport-code"></h3>
+                            <p class="airport-name"></p>
+                            <div class="time-info">
+                                <div class="scheduled">Scheduled: <span></span></div>
+                                <div class="estimated">Estimated: <span></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flight-info">
+                    <div class="info-section">
+                        <h3>Aircraft Information</h3>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <label>Aircraft Type</label>
+                                <span class="aircraft-type"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Registration</label>
+                                <span class="registration"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Age</label>
+                                <span class="aircraft-age"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Operator</label>
+                                <span class="operator"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>Flight Data</h3>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <label>Altitude</label>
+                                <span class="altitude"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Ground Speed</label>
+                                <span class="ground-speed"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Vertical Speed</label>
+                                <span class="vertical-speed">N/A</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Track</label>
+                                <span class="track"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Heading</label>
+                                <span class="heading">N/A</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Squawk</label>
+                                <span class="squawk">N/A</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <main class="map-container">
             <div id="map"></div>
         </main>
