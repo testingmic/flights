@@ -3,6 +3,7 @@ let markers = [];
 let infoWindow;
 let loadingState = false;
 let lastUpdateTime = null;
+let searchTimeout = null;
 
 function initMap() {
     map = new google.maps.Map(document.getElementById("map"), {
@@ -67,8 +68,7 @@ function updateLastUpdateTime() {
     const now = new Date();
     lastUpdateTime = now;
     const timeString = now.toLocaleTimeString();
-    document.querySelector('header').insertAdjacentHTML('beforeend', 
-        `<div class="last-update">Last updated: ${timeString}</div>`);
+    // document.querySelector('header').insertAdjacentHTML('beforeend', `<div class="last-update">Last updated: ${timeString}</div>`);
 }
 
 function fetchFlights(searchTerm = "") {
@@ -139,27 +139,35 @@ function updateFlightList(flights) {
     });
 }
 
-/* Search Input */
+/* Search Input with Debounce */
 document.getElementById("search-input").addEventListener("input", function() {
     let query = this.value.trim();
     const suggestionsDiv = document.getElementById("suggestions");
     
-    if (query.length > 2) {
-        fetch(`./api/search_flights.php?query=${encodeURIComponent(query)}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(suggestions => showSuggestions(suggestions))
-            .catch(error => {
-                console.error("Error fetching suggestions:", error);
-                suggestionsDiv.style.display = "none";
-            });
-    } else {
-        suggestionsDiv.style.display = "none";
+    // Clear any existing timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
     }
+    
+    // Set a new timeout
+    searchTimeout = setTimeout(() => {
+        if (query.length > 2) {
+            fetch(`./api/search_flights.php?query=${encodeURIComponent(query)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(suggestions => showSuggestions(suggestions))
+                .catch(error => {
+                    console.error("Error fetching suggestions:", error);
+                    suggestionsDiv.style.display = "none";
+                });
+        } else {
+            suggestionsDiv.style.display = "none";
+        }
+    }, 300); // 300ms debounce delay
 });
 
 function showSuggestions(suggestions) {
@@ -174,11 +182,11 @@ function showSuggestions(suggestions) {
     suggestions.forEach(suggestion => {
         let div = document.createElement("div");
         div.className = "suggestion-item";
-        div.textContent = suggestion;
+        div.textContent = `${suggestion.callsign} - ${suggestion.origin_country}`;
         div.addEventListener("click", function() {
-            document.getElementById("search-input").value = suggestion;
+            document.getElementById("search-input").value = `${suggestion.callsign} - ${suggestion.origin_country}`;
             suggestionsDiv.style.display = "none";
-            fetchFlights(suggestion);
+            fetchFlights(suggestion.origin_country);
         });
         suggestionsDiv.appendChild(div);
     });

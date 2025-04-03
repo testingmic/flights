@@ -83,18 +83,12 @@ class Flight {
     
     public function getFlights($searchTerm = "") {
         try {
-            $query = "SELECT * FROM flights WHERE last_contact >= NOW() - INTERVAL 5 MINUTE";
+            $query = "SELECT * FROM flights WHERE last_contact >= NOW() - INTERVAL 30 MINUTE";
         
             if (!empty($searchTerm)) {
-                $query .= " AND (callsign LIKE :search OR origin_country LIKE :search)";
+                $query .= " AND (callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%')";
             }
-        
             $stmt = $this->conn->prepare($query);
-            
-            if (!empty($searchTerm)) {
-                $searchTerm = "%$searchTerm%";
-                $stmt->bindParam(":search", $searchTerm, PDO::PARAM_STR);
-            }
         
             $stmt->execute();
             return $stmt->fetchAll();
@@ -106,14 +100,15 @@ class Flight {
 
     public function searchFlights($searchTerm) {
         try {
-            $query = "SELECT DISTINCT callsign FROM flights WHERE callsign LIKE :search 
-                      UNION SELECT DISTINCT origin_country FROM flights WHERE origin_country LIKE :search";
-        
+            // Search in both callsign and origin_country with better matching
+            $query = "SELECT * FROM flights WHERE callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%'";
             $stmt = $this->conn->prepare($query);
-            $searchTerm = "%$searchTerm%";
-            $stmt->bindParam(":search", $searchTerm, PDO::PARAM_STR);
             $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return array_values($results); // Reindex array
+            
         } catch (PDOException $e) {
             $this->logError("Error searching flights: " . $e->getMessage());
             return [];
