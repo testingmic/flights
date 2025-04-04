@@ -10,54 +10,116 @@ let visibleMarkers = new Set();
 let updateInterval;
 let allFlights = [];
 let flightPath;
+let trackedFlightInterval = null;
 
 function initMap() {
-    // Custom map style similar to Flightradar24
-    const mapStyle = [
-        {
-            "featureType": "landscape",
-            "elementType": "geometry",
-            "stylers": [{"color": "#f5f5f5"}]
-        },
-        {
-            "featureType": "water",
-            "elementType": "geometry",
-            "stylers": [{"color": "#c9c9c9"}]
-        },
-        {
-            "featureType": "road",
-            "elementType": "geometry",
-            "stylers": [{"visibility": "off"}]
-        },
-        {
-            "featureType": "poi",
-            "elementType": "all",
-            "stylers": [{"visibility": "off"}]
-        },
-        {
-            "featureType": "administrative",
-            "elementType": "labels",
-            "stylers": [{"visibility": "off"}]
-        }
-    ];
-
-    map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 20.0, lng: 0.0 },
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 20, lng: 0 },
         zoom: 2,
-        minZoom: 2,
-        maxZoom: 8,
-        styles: mapStyle,
-        disableDefaultUI: true,
-        zoomControl: true,
-        zoomControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_CENTER
-        },
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-        fullscreenControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_TOP
-        }
+        maxZoom: 20,
+        minZoom: 1,
+        styles: [
+            {
+                "featureType": "all",
+                "elementType": "geometry",
+                "stylers": [{"color": "#242f3e"}]
+            },
+            {
+                "featureType": "all",
+                "elementType": "labels.text.stroke",
+                "stylers": [{"lightness": -80}]
+            },
+            {
+                "featureType": "administrative",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#746855"}]
+            },
+            {
+                "featureType": "landscape",
+                "elementType": "all",
+                "stylers": [{"color": "#2b3544"}]
+            },
+            {
+                "featureType": "poi",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#746855"}]
+            },
+            {
+                "featureType": "poi",
+                "elementType": "labels.text.stroke",
+                "stylers": [{"lightness": -80}]
+            },
+            {
+                "featureType": "poi",
+                "elementType": "labels.icon",
+                "stylers": [{"visibility": "off"}]
+            },
+            {
+                "featureType": "poi.park",
+                "elementType": "geometry",
+                "stylers": [{"color": "#263c3f"}]
+            },
+            {
+                "featureType": "poi.park",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#6b9a76"}]
+            },
+            {
+                "featureType": "road",
+                "elementType": "geometry",
+                "stylers": [{"color": "#38414e"}]
+            },
+            {
+                "featureType": "road",
+                "elementType": "geometry.stroke",
+                "stylers": [{"color": "#212a37"}]
+            },
+            {
+                "featureType": "road",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#9ca5b3"}]
+            },
+            {
+                "featureType": "road.highway",
+                "elementType": "geometry",
+                "stylers": [{"color": "#746855"}]
+            },
+            {
+                "featureType": "road.highway",
+                "elementType": "geometry.stroke",
+                "stylers": [{"color": "#1f2835"}]
+            },
+            {
+                "featureType": "road.highway",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#f3d19c"}]
+            },
+            {
+                "featureType": "transit",
+                "elementType": "geometry",
+                "stylers": [{"color": "#2f3948"}]
+            },
+            {
+                "featureType": "transit.station",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#d59563"}]
+            },
+            {
+                "featureType": "water",
+                "elementType": "geometry",
+                "stylers": [{"color": "#17263c"}]
+            },
+            {
+                "featureType": "water",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#515c6d"}]
+            },
+            {
+                "featureType": "water",
+                "elementType": "labels.text.stroke",
+                "stylers": [{"lightness": -20}]
+            }
+        ]
     });
 
     // Initialize MarkerClusterer
@@ -124,14 +186,14 @@ function setupPeriodicUpdates() {
     // Update flights every 30 seconds
     updateInterval = setInterval(() => {
         if (!document.hidden) {  // Only update if page is visible
-            fetchFlights(); // This will now maintain the current search filter
+            // fetchFlights(); // This will now maintain the current search filter
         }
     }, 30000);
 
     // Add visibility change listener
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            fetchFlights();  // This will now maintain the current search filter
+            // fetchFlights();  // This will now maintain the current search filter
         }
     });
 }
@@ -160,8 +222,84 @@ function clearMarkers() {
     visibleMarkers.clear();
 }
 
+function startTrackingFlight(flight) {
+    // Clear any existing interval
+    if (trackedFlightInterval) {
+        clearInterval(trackedFlightInterval);
+    }
+
+    // Find the marker for this flight
+    const marker = markers.find(m => {
+        const pos = m.getPosition();
+        return pos.lat().toFixed(6) === parseFloat(flight.latitude).toFixed(6) && 
+               pos.lng().toFixed(6) === parseFloat(flight.longitude).toFixed(6);
+    });
+
+    // Create new interval for this flight
+    trackedFlightInterval = setInterval(() => {
+        fetch(`./api/get_flight_details.php?icao24=${encodeURIComponent(flight.icao24)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.path && data.path.length > 0) {
+                    // Update flight path
+                    if (flightPath) {
+                        flightPath.setMap(null);
+                    }
+                    
+                    const path = data.path.map(point => ({
+                        lat: point[1],
+                        lng: point[2]
+                    }));
+
+                    flightPath = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: '#FF0000',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        map: map
+                    });
+
+                    // Update marker position if it exists
+                    if (marker && data.path.length > 0) {
+                        const latestPoint = data.path[data.path.length - 1];
+                        marker.setPosition({
+                            lat: latestPoint[1],
+                            lng: latestPoint[2]
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error updating flight path:', error);
+            });
+    }, 5000); // Update every 5 seconds
+}
+
+function stopTrackingFlight() {
+    if (trackedFlightInterval) {
+        clearInterval(trackedFlightInterval);
+        trackedFlightInterval = null;
+    }
+}
+
 function showFlightDetails(flight) {
     const modal = document.getElementById('flight-details-modal');
+    
+    // Remove selected class from all flight items
+    document.querySelectorAll('.flight-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+
+    // Add selected class to the clicked flight item
+    const flightItems = document.querySelectorAll('.flight-item');
+    const selectedItem = Array.from(flightItems).find(item => {
+        const callsign = item.querySelector('.callsign').textContent.replace('✈ ', '');
+        return callsign === (flight.callsign || 'Unknown');
+    });
+    if (selectedItem) {
+        selectedItem.classList.add('selected');
+    }
     
     // Update header
     modal.querySelector('.flight-callsign').textContent = flight.callsign || 'N/A';
@@ -238,68 +376,59 @@ function showFlightDetails(flight) {
     modal.querySelector('.category').textContent = flight.category ? categories[flight.category] : 'N/A';
     modal.querySelector('.spi').textContent = flight.spi === '1' ? 'Yes' : 'No';
 
-    // Fetch flight path data if we have an ICAO24
-    if (flight.icao24) {
-        fetch(`./api/get_flight_details.php?icao24=${encodeURIComponent(flight.icao24)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.path && data.path.length > 0) {
-                    // Create a polyline for the flight path
-                    const path = data.path.map(point => ({
-                        lat: point[1],
-                        lng: point[2]
-                    }));
-
-                    // Draw the flight path on the map
-                    if (flightPath) {
-                        flightPath.setMap(null); // Remove existing path
-                    }
-                    flightPath = new google.maps.Polyline({
-                        path: path,
-                        geodesic: true,
-                        strokeColor: '#FF0000',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 2,
-                        map: map
-                    });
-
-                    // Center map on the flight path
-                    const bounds = new google.maps.LatLngBounds();
-                    path.forEach(point => bounds.extend(point));
-                    map.fitBounds(bounds);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching flight path:', error);
-            });
-    }
+    // Start tracking this flight
+    startTrackingFlight(flight);
 
     // Show modal
     modal.classList.add('active');
 }
 
-// Add close modal functionality
+// Modify the close modal functionality to remove the selected class
 document.querySelector('.close-modal').addEventListener('click', () => {
-    document.getElementById('flight-details-modal').classList.remove('active');
+    const modal = document.getElementById('flight-details-modal');
+    // Remove selected class from all flight items
+    document.querySelectorAll('.flight-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    stopTrackingFlight();
+    modal.classList.remove('active');
 });
 
 function addMarker(flight) {
-    // Calculate rotation angle based on velocity
+    // Calculate rotation angle based on true track
     const rotation = flight.true_track ? parseFloat(flight.true_track) : 0;
+    
+    // Create SVG icon for airplane
+    const svgIcon = {
+        path: "M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z",
+        fillColor: '#FFD700', // Yellow color
+        fillOpacity: 1,
+        strokeWeight: 1,
+        strokeColor: '#000000',
+        scale: 1.5,
+        rotation: rotation
+    };
     
     const marker = new google.maps.Marker({
         position: { lat: parseFloat(flight.latitude), lng: parseFloat(flight.longitude) },
-        icon: {
-            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-            scale: 2,
-            rotation: rotation,
-            fillColor: '#FF0000',
-            fillOpacity: 1,
-            strokeWeight: 1,
-            strokeColor: '#000000'
-        },
+        icon: svgIcon,
         title: `${flight.callsign || "Unknown"} - ${flight.origin_country}`,
-        optimized: true  // Enable marker optimization
+        optimized: true
+    });
+
+    // Add hover effect
+    marker.addListener('mouseover', () => {
+        marker.setIcon({
+            ...svgIcon,
+            fillColor: '#FFA500' // Lighter orange color on hover
+        });
+    });
+
+    marker.addListener('mouseout', () => {
+        marker.setIcon({
+            ...svgIcon,
+            fillColor: '#FFD700' // Back to yellow
+        });
     });
 
     // Use closure to prevent memory leaks
@@ -396,9 +525,9 @@ function updateFlightSummary(flights) {
         return acc;
     }, {});
 
-    // Sort countries by number of flights (descending)
+    // Sort countries alphabetically
     const sortedCountries = Object.entries(countryGroups)
-        .sort(([, a], [, b]) => b.length - a.length);
+        .sort(([a], [b]) => a.localeCompare(b));
 
     // Update country list
     const countryList = document.getElementById('country-list');
@@ -551,8 +680,9 @@ window.addEventListener('resize', () => {
     }
 });
 
-// Clean up on page unload
+// Add cleanup for tracked flights when the page unloads
 window.addEventListener('unload', () => {
+    stopTrackingFlight();
     clearMarkers();
     if (updateInterval) {
         clearInterval(updateInterval);

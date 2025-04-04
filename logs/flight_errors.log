@@ -1,5 +1,0 @@
-[2025-04-03 23:49:12] Error fetching flights: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'altitude' in 'field list'
-[2025-04-03 23:49:27] Error fetching flights: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'altitude' in 'field list'
-[2025-04-03 23:50:36] Error fetching flights: SQLSTATE[42S22]: Column not found: 1054 Unknown column '•' in 'field list'
-[2025-04-03 23:50:38] Error fetching flights: SQLSTATE[42S22]: Column not found: 1054 Unknown column '•' in 'field list'
-[2025-04-03 23:50:45] Error fetching flights: SQLSTATE[42S22]: Column not found: 1054 Unknown column '•' in 'field list'

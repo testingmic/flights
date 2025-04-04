@@ -9,12 +9,13 @@ if (!isset($_GET['icao24'])) {
 
 $icao24 = $_GET['icao24'];
 
-// Cache setup
-$cache_file = __DIR__ . "/../cache/flight_{$icao24}.json";
-$cache_time = 300; // 5 minutes cache
+// Set cache time to 1 minute
+$cache_time = 60; // 1 minute in seconds
 
-// Check if we have cached data
+// Check if we have a cached response
+$cache_file = "cache/flight_path_{$icao24}.json";
 if (file_exists($cache_file) && (time() - filemtime($cache_file) < $cache_time)) {
+    // Return cached data
     echo file_get_contents($cache_file);
     exit;
 }
