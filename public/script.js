@@ -1,10 +1,13 @@
 let map;
 let markers = [];
+let clusterer;
 let infoWindow;
 let loadingState = false;
 let lastUpdateTime = null;
 let searchTimeout = null;
 let selectedFlight = null;
+let visibleMarkers = new Set();
+let updateInterval;
 
 function initMap() {
     // Custom map style similar to Flightradar24
@@ -55,6 +58,15 @@ function initMap() {
         }
     });
 
+    // Initialize MarkerClusterer
+    clusterer = new markerClusterer.MarkerClusterer({ 
+        map,
+        algorithm: new markerClusterer.SuperClusterAlgorithm({
+            radius: 60,
+            maxZoom: 8
+        })
+    });
+
     // Add custom controls
     addMapControls();
     
@@ -62,99 +74,141 @@ function initMap() {
         maxWidth: 300
     });
     
-    fetchFlights(); // Initial load
+    // Add map event listeners for optimization
+    map.addListener('idle', () => {
+        updateVisibleMarkers();
+    });
+
+    // Initial load
+    fetchFlights();
+
+    // Set up periodic updates
+    setupPeriodicUpdates();
 }
 
-function addMapControls() {
-    // Add refresh button
-    const refreshButton = document.createElement('button');
-    refreshButton.className = 'map-control refresh-button';
-    refreshButton.innerHTML = '🔄';
-    refreshButton.title = 'Refresh Flights';
-    refreshButton.onclick = () => fetchFlights();
-    
-    // Add zoom to world button
-    const worldButton = document.createElement('button');
-    worldButton.className = 'map-control world-button';
-    worldButton.innerHTML = '🌍';
-    worldButton.title = 'Show All Flights';
-    worldButton.onclick = () => {
-        map.setCenter({ lat: 20.0, lng: 0.0 });
-        map.setZoom(2);
-    };
-    
-    // Add controls container
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'map-controls';
-    controlsContainer.appendChild(refreshButton);
-    controlsContainer.appendChild(worldButton);
-    
-    map.controls[google.maps.ControlPosition.RIGHT_TOP].push(controlsContainer);
+function setupPeriodicUpdates() {
+    // Clear existing interval if any
+    if (updateInterval) {
+        clearInterval(updateInterval);
+    }
+
+    // Update flights every 30 seconds
+    updateInterval = setInterval(() => {
+        if (!document.hidden) {  // Only update if page is visible
+            fetchFlights();
+        }
+    }, 30000);
+
+    // Add visibility change listener
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            fetchFlights();  // Update immediately when page becomes visible
+        }
+    });
+}
+
+function updateVisibleMarkers() {
+    const bounds = map.getBounds();
+    if (!bounds) return;
+
+    visibleMarkers.clear();
+    markers.forEach(marker => {
+        if (bounds.contains(marker.getPosition())) {
+            visibleMarkers.add(marker);
+        }
+    });
 }
 
 function clearMarkers() {
-    markers.forEach(marker => marker.setMap(null));
+    if (clusterer) {
+        clusterer.clearMarkers();
+    }
+    markers.forEach(marker => {
+        marker.setMap(null);
+        google.maps.event.clearInstanceListeners(marker);
+    });
     markers = [];
+    visibleMarkers.clear();
 }
 
 function showFlightDetails(flight) {
     const modal = document.getElementById('flight-details-modal');
     
-    // Update header information
-    modal.querySelector('.flight-callsign').textContent = flight.callsign || 'Unknown';
+    // Update header
+    modal.querySelector('.flight-callsign').textContent = flight.callsign || 'N/A';
     modal.querySelector('.flight-icao').textContent = flight.icao24;
     modal.querySelector('.flight-operator').textContent = flight.origin_country;
 
-    // Update aircraft image
-    const aircraftImage = modal.querySelector('#aircraft-image');
-    // Default image in case API fails
-    const defaultImage = 'https://www.flightradar24.com/static/images/aircraft_generic.png';
+    // Load aircraft image with proper error handling
+    const imgElement = modal.querySelector('.flight-image img');
+    const defaultImage = 'https://www.flightradar24.com/static/images/aircraft-silhouettes/A320.png';
     
-    // Try to get aircraft image from registration number
+    // First set the default image and show loading state
+    imgElement.style.opacity = '0';
+    imgElement.src = defaultImage;
+
+    // Try to load actual aircraft image if we have an ICAO24
     if (flight.icao24) {
-        // First set default image while loading
-        aircraftImage.src = defaultImage;
+        // Create a temporary image to test loading
+        const tempImage = new Image();
+        tempImage.onload = () => {
+            imgElement.src = tempImage.src;
+            imgElement.style.opacity = '1';
+        };
+        tempImage.onerror = () => {
+            // If loading fails, ensure default image is shown
+            imgElement.src = defaultImage;
+            imgElement.style.opacity = '1';
+        };
         
-        // Attempt to load actual aircraft image
-        const img = new Image();
-        img.onload = function() {
-            aircraftImage.src = this.src;
-        };
-        img.onerror = function() {
-            // If loading fails, keep the default image
-            aircraftImage.src = defaultImage;
-        };
-        // Try to load image from planespotters.net (you'll need to replace with actual API endpoint)
-        img.src = `https://api.planespotters.net/pub/photos/reg/${flight.icao24}`;
+        // Attempt to load from aircraft database (using ICAO24)
+        tempImage.src = `https://cdn.planespotters.net/media/photos/original/${flight.icao24.toLowerCase()}.jpg`;
     } else {
-        aircraftImage.src = defaultImage;
+        // If no ICAO24, just show default image
+        imgElement.src = defaultImage;
+        imgElement.style.opacity = '1';
     }
+
+    // Update Flight Status
+    modal.querySelector('.flight-status').textContent = flight.on_ground === '1' ? 'On Ground' : 'In Air';
+    modal.querySelector('.last-contact').textContent = new Date(flight.last_contact).toLocaleString();
+    modal.querySelector('.origin-country').textContent = flight.origin_country || 'N/A';
+
+    // Update Position Data
+    modal.querySelector('.latitude').textContent = `${parseFloat(flight.latitude).toFixed(4)}°`;
+    modal.querySelector('.longitude').textContent = `${parseFloat(flight.longitude).toFixed(4)}°`;
+    modal.querySelector('.baro-altitude').textContent = flight.baro_altitude ? `${parseFloat(flight.baro_altitude).toFixed(1)} ft` : 'N/A';
+    modal.querySelector('.geo-altitude').textContent = flight.geo_altitude ? `${parseFloat(flight.geo_altitude).toFixed(1)} ft` : 'N/A';
+
+    // Update Flight Data
+    modal.querySelector('.velocity').textContent = flight.velocity ? `${parseFloat(flight.velocity).toFixed(1)} knots` : 'N/A';
+    modal.querySelector('.true-track').textContent = flight.true_track ? `${parseFloat(flight.true_track).toFixed(1)}°` : 'N/A';
+    modal.querySelector('.vertical-rate').textContent = flight.vertical_rate ? `${parseFloat(flight.vertical_rate).toFixed(1)} ft/min` : 'N/A';
+    modal.querySelector('.squawk').textContent = flight.squawk || 'N/A';
+
+    // Update Technical Details
+    const positionSources = {
+        0: 'ADS-B',
+        1: 'ASTERIX',
+        2: 'MLAT',
+        3: 'Other'
+    };
+    modal.querySelector('.position-source').textContent = positionSources[flight.position_source] || 'Unknown';
     
-    // Update route information
-    const departure = modal.querySelector('.departure');
-    const arrival = modal.querySelector('.arrival');
-    
-    // Assuming we have departure and arrival data
-    departure.querySelector('.airport-code').textContent = 'ORD';
-    departure.querySelector('.airport-name').textContent = 'Chicago';
-    departure.querySelector('.scheduled span').textContent = '5:50 PM';
-    departure.querySelector('.actual span').textContent = '6:22 PM';
-    
-    arrival.querySelector('.airport-code').textContent = 'MIA';
-    arrival.querySelector('.airport-name').textContent = 'Miami';
-    arrival.querySelector('.scheduled span').textContent = '10:04 PM';
-    arrival.querySelector('.estimated span').textContent = '9:53 PM';
-    
-    // Update aircraft information
-    modal.querySelector('.aircraft-type').textContent = 'Boeing 737-823';
-    modal.querySelector('.registration').textContent = flight.icao24;
-    modal.querySelector('.aircraft-age').textContent = 'N/A';
-    
-    // Update flight data
-    modal.querySelector('.altitude').textContent = `${Math.round(flight.altitude)}m`;
-    modal.querySelector('.ground-speed').textContent = `${Math.round(flight.velocity * 3.6)} km/h`;
-    modal.querySelector('.track').textContent = 'N/A';
-    
+    const categories = {
+        0: 'No information',
+        1: 'No ADS-B Emitter Category Information',
+        2: 'Light (< 15500 lbs)',
+        3: 'Small (15500 to 75000 lbs)',
+        4: 'Large (75000 to 300000 lbs)',
+        5: 'High Vortex Large',
+        6: 'Heavy (> 300000 lbs)',
+        7: 'High Performance',
+        8: 'Rotorcraft'
+    };
+    modal.querySelector('.category').textContent = flight.category ? categories[flight.category] : 'N/A';
+    modal.querySelector('.spi').textContent = flight.spi === '1' ? 'Yes' : 'No';
+
     // Show modal
     modal.classList.add('active');
 }
@@ -166,11 +220,10 @@ document.querySelector('.close-modal').addEventListener('click', () => {
 
 function addMarker(flight) {
     // Calculate rotation angle based on velocity
-    const rotation = flight.velocity ? Math.atan2(flight.velocity, flight.velocity) * (180 / Math.PI) : 0;
+    const rotation = flight.true_track ? parseFloat(flight.true_track) : 0;
     
     const marker = new google.maps.Marker({
         position: { lat: parseFloat(flight.latitude), lng: parseFloat(flight.longitude) },
-        map: map,
         icon: {
             path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
             scale: 2,
@@ -180,15 +233,19 @@ function addMarker(flight) {
             strokeWeight: 1,
             strokeColor: '#000000'
         },
-        title: `${flight.callsign || "Unknown"} - ${flight.origin_country}`
+        title: `${flight.callsign || "Unknown"} - ${flight.origin_country}`,
+        optimized: true  // Enable marker optimization
     });
 
-    marker.addListener('click', () => {
+    // Use closure to prevent memory leaks
+    const clickHandler = () => {
         selectedFlight = flight;
         showFlightDetails(flight);
-    });
+    };
 
+    marker.addListener('click', clickHandler);
     markers.push(marker);
+    return marker;
 }
 
 function setLoading(isLoading) {
@@ -227,9 +284,18 @@ function fetchFlights(searchTerm = "") {
         .then(data => {
             clearMarkers();
             updateFlightList(data);
+            
+            // Batch process markers
+            const newMarkers = [];
             data.forEach(flight => {
-                addMarker(flight);
+                const marker = addMarker(flight);
+                newMarkers.push(marker);
             });
+            
+            // Update marker clusterer with all new markers at once
+            clusterer.addMarkers(newMarkers);
+            
+            updateVisibleMarkers();
             updateLastUpdateTime();
         })
         .catch(error => {
@@ -260,18 +326,26 @@ function updateFlightList(flights) {
                 <span class="country">${flight.origin_country}</span>
             </div>
             <div class="flight-details">
-                <span>Altitude: ${Math.round(flight.altitude)}m</span>
-                <span>Speed: ${Math.round(flight.velocity * 3.6)} km/h</span>
+                <span>Altitude: ${Math.round(flight.baro_altitude || 0)} ft</span>
+                <span>Speed: ${Math.round(flight.velocity || 0)} knots</span>
             </div>
         `;
         
         li.addEventListener('click', () => {
-            const marker = markers.find(m => 
-                m.getPosition().lat() === parseFloat(flight.latitude) && 
-                m.getPosition().lng() === parseFloat(flight.longitude)
-            );
+            // Find the corresponding marker
+            const marker = markers.find(m => {
+                const pos = m.getPosition();
+                return pos.lat().toFixed(6) === parseFloat(flight.latitude).toFixed(6) && 
+                       pos.lng().toFixed(6) === parseFloat(flight.longitude).toFixed(6);
+            });
+
             if (marker) {
-                google.maps.event.trigger(marker, 'click');
+                // Center the map on the marker
+                map.setCenter(marker.getPosition());
+                map.setZoom(6);
+                
+                // Show flight details
+                selectedFlight = flight;
                 showFlightDetails(flight);
             }
         });
@@ -343,6 +417,14 @@ function showSuggestions(suggestions) {
 window.addEventListener('resize', () => {
     if (map) {
         google.maps.event.trigger(map, 'resize');
+    }
+});
+
+// Clean up on page unload
+window.addEventListener('unload', () => {
+    clearMarkers();
+    if (updateInterval) {
+        clearInterval(updateInterval);
     }
 });
 

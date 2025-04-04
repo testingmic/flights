@@ -116,7 +116,7 @@ class Flight {
     
     public function getFlights($searchTerm = "") {
         try {
-            $query = "SELECT • FROM flights WHERE last_contact >= NOW() - INTERVAL 30 MINUTE";
+            $query = "SELECT * FROM flights WHERE last_contact >= NOW() - INTERVAL 30 MINUTE";
         
             if (!empty($searchTerm)) {
                 $query .= " AND (callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%')";
@@ -134,7 +134,7 @@ class Flight {
     public function searchFlights($searchTerm) {
         try {
             // Search in both callsign and origin_country with better matching
-            $query = "SELECT • FROM flights WHERE callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%'";
+            $query = "SELECT * FROM flights WHERE callsign LIKE '%{$searchTerm}%' OR origin_country LIKE '%{$searchTerm}%'";
             $stmt = $this->conn->prepare($query);
             $stmt->execute();
             

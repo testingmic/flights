@@ -8,6 +8,9 @@
     <!-- Google Maps API -->
     <script src="https://maps.googleapis.com/maps/api/js?sensor=false&callback=myMap"></script>
     
+    <!-- MarkerClusterer -->
+    <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+    
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -52,82 +55,82 @@
                     </div>
                 </div>
                 
-                <div class="flight-route">
-                    <div class="route-points">
-                        <div class="departure">
-                            <h3 class="airport-code"></h3>
-                            <p class="airport-name"></p>
-                            <div class="time-info">
-                                <div class="scheduled">Scheduled: <span></span></div>
-                                <div class="actual">Actual: <span></span></div>
-                            </div>
+                <div class="info-section">
+                    <h3>Flight Status</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Status</label>
+                            <span class="flight-status"></span>
                         </div>
-                        
-                        <div class="route-line">
-                            <div class="plane-icon">✈</div>
+                        <div class="info-item">
+                            <label>Last Updated</label>
+                            <span class="last-contact"></span>
                         </div>
-                        
-                        <div class="arrival">
-                            <h3 class="airport-code"></h3>
-                            <p class="airport-name"></p>
-                            <div class="time-info">
-                                <div class="scheduled">Scheduled: <span></span></div>
-                                <div class="estimated">Estimated: <span></span></div>
-                            </div>
+                        <div class="info-item">
+                            <label>Origin Country</label>
+                            <span class="origin-country"></span>
                         </div>
                     </div>
                 </div>
-                
-                <div class="flight-info">
-                    <div class="info-section">
-                        <h3>Aircraft Information</h3>
-                        <div class="info-list">
-                            <div class="info-item">
-                                <label>Aircraft Type</label>
-                                <span class="aircraft-type"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Registration</label>
-                                <span class="registration"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Age</label>
-                                <span class="aircraft-age"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Operator</label>
-                                <span class="operator"></span>
-                            </div>
+
+                <div class="info-section">
+                    <h3>Position Data</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Latitude</label>
+                            <span class="latitude"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Longitude</label>
+                            <span class="longitude"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Barometric Altitude</label>
+                            <span class="baro-altitude"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Geometric Altitude</label>
+                            <span class="geo-altitude"></span>
                         </div>
                     </div>
-                    
-                    <div class="info-section">
-                        <h3>Flight Data</h3>
-                        <div class="info-list">
-                            <div class="info-item">
-                                <label>Altitude</label>
-                                <span class="altitude"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Ground Speed</label>
-                                <span class="ground-speed"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Vertical Speed</label>
-                                <span class="vertical-speed">N/A</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Track</label>
-                                <span class="track"></span>
-                            </div>
-                            <div class="info-item">
-                                <label>Heading</label>
-                                <span class="heading">N/A</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Squawk</label>
-                                <span class="squawk">N/A</span>
-                            </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Flight Data</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Ground Speed</label>
+                            <span class="velocity"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>True Track</label>
+                            <span class="true-track"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Vertical Rate</label>
+                            <span class="vertical-rate"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Squawk</label>
+                            <span class="squawk"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Technical Details</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Position Source</label>
+                            <span class="position-source"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Category</label>
+                            <span class="category"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>SPI</label>
+                            <span class="spi"></span>
                         </div>
                     </div>
                 </div>
@@ -139,10 +142,23 @@
         </main>
 
         <aside class="sidebar">
-            <h2>Flights</h2>
-            <ul id="flight-list">
-                <li>Loading flights...</li>
-            </ul>
+            <div class="flight-summary">
+                <h2>Flight Summary</h2>
+                <div class="total-flights">
+                    <span>Total Flights:</span>
+                    <span id="total-flights-count">0</span>
+                </div>
+                <div class="country-summary">
+                    <h3>Flights by Country</h3>
+                    <div id="country-list" class="country-list"></div>
+                </div>
+            </div>
+            <div class="flight-list-container">
+                <h2>Flights</h2>
+                <ul id="flight-list">
+                    <li>Loading flights...</li>
+                </ul>
+            </div>
         </aside>
     </div>
 </body>
