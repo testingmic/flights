@@ -9,6 +9,7 @@ let selectedFlight = null;
 let visibleMarkers = new Set();
 let updateInterval;
 let allFlights = [];
+let flightPath;
 
 function initMap() {
     // Custom map style similar to Flightradar24
@@ -123,14 +124,14 @@ function setupPeriodicUpdates() {
     // Update flights every 30 seconds
     updateInterval = setInterval(() => {
         if (!document.hidden) {  // Only update if page is visible
-            fetchFlights();
+            fetchFlights(); // This will now maintain the current search filter
         }
     }, 30000);
 
     // Add visibility change listener
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            fetchFlights();  // Update immediately when page becomes visible
+            fetchFlights();  // This will now maintain the current search filter
         }
     });
 }
@@ -237,6 +238,42 @@ function showFlightDetails(flight) {
     modal.querySelector('.category').textContent = flight.category ? categories[flight.category] : 'N/A';
     modal.querySelector('.spi').textContent = flight.spi === '1' ? 'Yes' : 'No';
 
+    // Fetch flight path data if we have an ICAO24
+    if (flight.icao24) {
+        fetch(`./api/get_flight_details.php?icao24=${encodeURIComponent(flight.icao24)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.path && data.path.length > 0) {
+                    // Create a polyline for the flight path
+                    const path = data.path.map(point => ({
+                        lat: point[1],
+                        lng: point[2]
+                    }));
+
+                    // Draw the flight path on the map
+                    if (flightPath) {
+                        flightPath.setMap(null); // Remove existing path
+                    }
+                    flightPath = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: '#FF0000',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        map: map
+                    });
+
+                    // Center map on the flight path
+                    const bounds = new google.maps.LatLngBounds();
+                    path.forEach(point => bounds.extend(point));
+                    map.fitBounds(bounds);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching flight path:', error);
+            });
+    }
+
     // Show modal
     modal.classList.add('active');
 }
@@ -289,14 +326,6 @@ function setLoading(isLoading) {
     }
 }
 
-function updateLastUpdateTime() {
-    const now = new Date();
-    lastUpdateTime = now;
-    const timeString = now.toLocaleTimeString();
-    document.querySelector('header').insertAdjacentHTML('beforeend', 
-        `<div class="last-update">Last updated: ${timeString}</div>`);
-}
-
 function fetchFlights(searchTerm = "") {
     if (loadingState) return;
     
@@ -316,11 +345,14 @@ function fetchFlights(searchTerm = "") {
             // Update the summary with all flights
             updateFlightSummary(allFlights);
 
-            // If there's a search term, filter the flights for display
-            const displayFlights = searchTerm 
+            // Get the current search input value
+            const currentSearch = document.getElementById('search-input').value.trim();
+            
+            // If there's a current search term, use it to filter flights
+            const displayFlights = currentSearch 
                 ? allFlights.filter(flight => 
-                    flight.origin_country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (flight.callsign && flight.callsign.toLowerCase().includes(searchTerm.toLowerCase()))
+                    flight.origin_country.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    (flight.callsign && flight.callsign.toLowerCase().includes(currentSearch.toLowerCase()))
                   )
                 : allFlights;
 
@@ -338,7 +370,6 @@ function fetchFlights(searchTerm = "") {
             clusterer.addMarkers(newMarkers);
             
             updateVisibleMarkers();
-            updateLastUpdateTime();
         })
         .catch(error => {
             console.error("Error fetching flights:", error);
@@ -533,11 +564,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if Google Maps API is loaded
     if (window.google && window.google.maps) {
         initMap();
+        // Initial load only
+        fetchFlights();
     } else {
         // If not loaded, wait for it
         window.addEventListener('load', () => {
             if (window.google && window.google.maps) {
                 initMap();
+                // Initial load only
+                fetchFlights();
             }
         });
     }
