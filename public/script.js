@@ -8,6 +8,7 @@ let searchTimeout = null;
 let selectedFlight = null;
 let visibleMarkers = new Set();
 let updateInterval;
+let allFlights = [];
 
 function initMap() {
     // Custom map style similar to Flightradar24
@@ -84,6 +85,33 @@ function initMap() {
 
     // Set up periodic updates
     setupPeriodicUpdates();
+}
+
+function addMapControls() {
+    // Add refresh button
+    const refreshButton = document.createElement('button');
+    refreshButton.className = 'map-control refresh-button';
+    refreshButton.innerHTML = '🔄';
+    refreshButton.title = 'Refresh Flights';
+    refreshButton.onclick = () => fetchFlights();
+    
+    // Add zoom to world button
+    const worldButton = document.createElement('button');
+    worldButton.className = 'map-control world-button';
+    worldButton.innerHTML = '🌍';
+    worldButton.title = 'Show All Flights';
+    worldButton.onclick = () => {
+        map.setCenter({ lat: 20.0, lng: 0.0 });
+        map.setZoom(2);
+    };
+    
+    // Add controls container
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'map-controls';
+    controlsContainer.appendChild(refreshButton);
+    controlsContainer.appendChild(worldButton);
+    
+    map.controls[google.maps.ControlPosition.RIGHT_TOP].push(controlsContainer);
 }
 
 function setupPeriodicUpdates() {
@@ -282,17 +310,31 @@ function fetchFlights(searchTerm = "") {
             return response.json();
         })
         .then(data => {
-            clearMarkers();
-            updateFlightList(data);
+            // Store all flights globally
+            allFlights = data;
             
-            // Batch process markers
+            // Update the summary with all flights
+            updateFlightSummary(allFlights);
+
+            // If there's a search term, filter the flights for display
+            const displayFlights = searchTerm 
+                ? allFlights.filter(flight => 
+                    flight.origin_country.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (flight.callsign && flight.callsign.toLowerCase().includes(searchTerm.toLowerCase()))
+                  )
+                : allFlights;
+
+            clearMarkers();
+            updateFlightList(displayFlights);
+            
+            // Batch process markers for filtered flights
             const newMarkers = [];
-            data.forEach(flight => {
+            displayFlights.forEach(flight => {
                 const marker = addMarker(flight);
                 newMarkers.push(marker);
             });
             
-            // Update marker clusterer with all new markers at once
+            // Update marker clusterer with filtered markers
             clusterer.addMarkers(newMarkers);
             
             updateVisibleMarkers();
@@ -306,6 +348,64 @@ function fetchFlights(searchTerm = "") {
         .finally(() => {
             setLoading(false);
         });
+}
+
+function updateFlightSummary(flights) {
+    // Update total flights count (always show total of all flights)
+    const totalFlightsCount = document.getElementById('total-flights-count');
+    totalFlightsCount.textContent = flights.length;
+
+    // Group flights by country
+    const countryGroups = flights.reduce((acc, flight) => {
+        const country = flight.origin_country || 'Unknown';
+        if (!acc[country]) {
+            acc[country] = [];
+        }
+        acc[country].push(flight);
+        return acc;
+    }, {});
+
+    // Sort countries by number of flights (descending)
+    const sortedCountries = Object.entries(countryGroups)
+        .sort(([, a], [, b]) => b.length - a.length);
+
+    // Update country list
+    const countryList = document.getElementById('country-list');
+    countryList.innerHTML = '';
+
+    sortedCountries.forEach(([country, countryFlights]) => {
+        const countryItem = document.createElement('div');
+        countryItem.className = 'country-item';
+        countryItem.innerHTML = `
+            <span class="country-name">${country}</span>
+            <span class="flight-count">${countryFlights.length}</span>
+        `;
+
+        // Add click handler to filter flights by country
+        countryItem.addEventListener('click', () => {
+            const searchInput = document.getElementById('search-input');
+            searchInput.value = country;
+            
+            // Filter flights for this country but keep summary unchanged
+            const countryFlights = allFlights.filter(f => 
+                f.origin_country.toLowerCase() === country.toLowerCase()
+            );
+            
+            clearMarkers();
+            updateFlightList(countryFlights);
+            
+            // Update markers for filtered flights
+            const newMarkers = [];
+            countryFlights.forEach(flight => {
+                const marker = addMarker(flight);
+                newMarkers.push(marker);
+            });
+            clusterer.addMarkers(newMarkers);
+            updateVisibleMarkers();
+        });
+
+        countryList.appendChild(countryItem);
+    });
 }
 
 function updateFlightList(flights) {
@@ -428,4 +528,17 @@ window.addEventListener('unload', () => {
     }
 });
 
-window.onload = initMap;
+// Initialize when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if Google Maps API is loaded
+    if (window.google && window.google.maps) {
+        initMap();
+    } else {
+        // If not loaded, wait for it
+        window.addEventListener('load', () => {
+            if (window.google && window.google.maps) {
+                initMap();
+            }
+        });
+    }
+});
